@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<body>
+<button id="accelerate">Accélérer</button>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io('http://localhost:3000');
+
+document.getElementById('accelerate').onclick = () => {
+    socket.emit('input', { action: 'accelerate' });
+};
+</script>
+</body>
+</html>
