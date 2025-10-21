@@ -27,19 +27,40 @@
         <button id="shoot-button"><span class="plane-icon">💥</span><br>Tirer</button>
     </div>
 
-    <div id="status" style="position: fixed; top: 10px; left: 10px; color: #fff; font-size: 14px;">Connexion...</div>
+    <div id="status" style="position: fixed; top: 10px; left: 10px; color: #fff; font-size: 14px;">Chargement Socket.IO...</div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
+        // Add loading feedback and debug info
         const statusDiv = document.getElementById('status');
+        statusDiv.textContent = 'Initialisation...';
         
-        // Add connection timeout
-        const socket = io({
-            timeout: 5000,
-            reconnection: true,
-            reconnectionDelay: 1000,
-            reconnectionAttempts: 5
-        });
+        // Add debug info to page
+        const debugInfo = document.createElement('div');
+        debugInfo.style.cssText = 'position: fixed; bottom: 10px; left: 10px; color: #fff; font-size: 12px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; max-width: 300px;';
+        debugInfo.innerHTML = `
+            <strong>Debug Info:</strong><br>
+            URL: ${window.location.href}<br>
+            Time: ${new Date().toLocaleTimeString()}<br>
+            UserAgent: ${navigator.userAgent.substring(0, 50)}...
+        `;
+        document.body.appendChild(debugInfo);
+        
+        // Try to load Socket.IO with error handling
+        let socket;
+        try {
+            statusDiv.textContent = 'Connexion Socket.IO...';
+            socket = io({
+                timeout: 10000,
+                reconnection: true,
+                reconnectionDelay: 2000,
+                reconnectionAttempts: 10,
+                forceNew: true
+            });
+        } catch (error) {
+            statusDiv.textContent = 'Erreur Socket.IO: ' + error.message;
+            console.error('Socket.IO Error:', error);
+        }
 
         const leftBtn = document.getElementById('left');
         const rightBtn = document.getElementById('right');
@@ -74,31 +95,90 @@
             }
         }
 
-        // Plane controls
-        leftBtn.addEventListener('pointerdown', () => sendControl('move', 'left'));
-        rightBtn.addEventListener('pointerdown', () => sendControl('move', 'right'));
-        accelerateBtn.addEventListener('pointerdown', () => sendControl('accelerate'));
-        
-        // Shooting functionality
-        shootButton.addEventListener('click', () => {
-            if (socket.connected) {
-                socket.emit('player-shoot');
-                console.log('Shot fired!');
-                // Visual feedback
-                shootButton.style.backgroundColor = '#ff6600';
-                setTimeout(() => {
-                    shootButton.style.backgroundColor = '#cc3300';
-                }, 100);
-            }
-        });
-
-        // Prevent buttons from being stuck on mobile
-        ['pointerup', 'pointercancel', 'touchend'].forEach(event => {
-            [leftBtn, rightBtn, accelerateBtn].forEach(btn => {
-                btn.addEventListener(event, () => {
-                    // Optional: send stop signal when button is released
+        // Enhanced button feedback system
+        function addButtonFeedback(button, action) {
+            let isPressed = false;
+            let pressInterval = null;
+            
+            const startAction = () => {
+                if (!isPressed) {
+                    isPressed = true;
+                    button.style.backgroundColor = button.dataset.activeColor || '#666';
+                    button.style.transform = 'scale(0.9)';
+                    
+                    // Send immediate action
+                    if (action) action();
+                    
+                    // For movement buttons, send continuous signals
+                    if (button === leftBtn || button === rightBtn) {
+                        pressInterval = setInterval(() => {
+                            if (isPressed && action) action();
+                        }, 50); // Send every 50ms for smooth movement
+                    }
+                }
+            };
+            
+            const endAction = () => {
+                if (isPressed) {
+                    isPressed = false;
+                    button.style.backgroundColor = button.dataset.originalColor || '#444';
+                    button.style.transform = 'scale(1)';
+                    
+                    if (pressInterval) {
+                        clearInterval(pressInterval);
+                        pressInterval = null;
+                    }
+                }
+            };
+            
+            // Store original colors
+            button.dataset.originalColor = getComputedStyle(button).backgroundColor;
+            
+            // Multiple event listeners for better mobile support
+            ['touchstart', 'mousedown', 'pointerdown'].forEach(event => {
+                button.addEventListener(event, (e) => {
+                    e.preventDefault();
+                    startAction();
                 });
             });
+            
+            ['touchend', 'mouseup', 'pointerup', 'touchcancel', 'pointercancel'].forEach(event => {
+                button.addEventListener(event, (e) => {
+                    e.preventDefault();
+                    endAction();
+                });
+            });
+            
+            // Prevent context menu on long press
+            button.addEventListener('contextmenu', (e) => e.preventDefault());
+        }
+        
+        // Setup enhanced controls with proper feedback
+        leftBtn.dataset.activeColor = '#0088ff';
+        rightBtn.dataset.activeColor = '#0088ff';
+        accelerateBtn.dataset.activeColor = '#0088cc';
+        shootButton.dataset.activeColor = '#ff6600';
+        
+        addButtonFeedback(leftBtn, () => sendControl('move', 'left'));
+        addButtonFeedback(rightBtn, () => sendControl('move', 'right'));
+        addButtonFeedback(accelerateBtn, () => sendControl('accelerate'));
+        
+        // Special handling for shoot button (single shot, not continuous)
+        let shootCooldown = false;
+        addButtonFeedback(shootButton, () => {
+            if (!shootCooldown && socket.connected) {
+                shootCooldown = true;
+                socket.emit('player-shoot');
+                console.log('🚀 Shot fired!');
+                
+                // Visual muzzle flash effect
+                shootButton.innerHTML = '<span class="plane-icon">🔥</span><br>FIRE!';
+                
+                setTimeout(() => {
+                    shootButton.innerHTML = '<span class="plane-icon">💥</span><br>Tirer';
+                    shootCooldown = false;
+                }, 200); // 200ms cooldown between shots
+            }
         });
     </script>
 </body>
