@@ -1,14 +1,44 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeu 2D - Desktop</title>
+    <style>
+        body { margin: 0; background-color: #333; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        #road { position: relative; width: 400px; height: 100vh; background-color: #555; border-left: 10px dashed #eee; border-right: 10px dashed #eee; }
+        #car { position: absolute; width: 50px; height: 80px; background-color: red; bottom: 50px; left: 50%; transform: translateX(-50%); transition: left 0.1s linear; }
+    </style>
+</head>
 <body>
-<h1>Desktop connecté</h1>
-<script src="/socket.io/socket.io.js"></script>
-<script>
-const socket = io('http://localhost:3000');
+    <div id="road">
+        <div id="car"></div>
+    </div>
 
-socket.on('state', (data) => {
-    console.log('État reçu :', data);
-});
-</script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const car = document.getElementById('car');
+        const road = document.getElementById('road');
+        let carPosition = road.offsetWidth / 2;
+        let acceleration = 0;
+
+        car.style.left = `${carPosition}px`;
+
+        socket.on('update', (data) => {
+            console.log('Données reçues:', data);
+            
+            if (data.action === 'move') {
+                if (data.direction === 'left') {
+                    carPosition -= 15;
+                } else if (data.direction === 'right') {
+                    carPosition += 15;
+                }
+                const carWidth = car.offsetWidth;
+                carPosition = Math.max(carWidth / 2, Math.min(road.offsetWidth - carWidth / 2, carPosition));
+                car.style.left = `${carPosition}px`;
+            }
+        });
+    </script>
 </body>
 </html>
