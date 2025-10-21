@@ -1,0 +1,28 @@
+<svg width="60" height="40" viewBox="0 0 60 40" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="jetGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e0e0e0;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#a0a0a0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#606060;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main fuselage -->
+  <ellipse cx="30" cy="20" rx="25" ry="8" fill="url(#jetGradient)" stroke="#333" stroke-width="1"/>
+  
+  <!-- Cockpit -->
+  <ellipse cx="15" cy="20" rx="8" ry="5" fill="#1a1a1a" stroke="#333" stroke-width="1"/>
+  
+  <!-- Wings -->
+  <path d="M20 12 L40 18 L45 16 L50 20 L45 24 L40 22 L20 28 Z" fill="url(#jetGradient)" stroke="#333" stroke-width="1"/>
+  
+  <!-- Tail -->
+  <path d="M45 18 L55 15 L58 20 L55 25 L45 22 Z" fill="url(#jetGradient)" stroke="#333" stroke-width="1"/>
+  
+  <!-- Engine exhaust -->
+  <ellipse cx="52" cy="20" rx="3" ry="2" fill="#ff4400" opacity="0.8"/>
+  
+  <!-- Details -->
+  <circle cx="18" cy="18" r="2" fill="#0066cc" opacity="0.7"/>
+  <rect x="25" y="19" width="15" height="2" fill="#333" opacity="0.5"/>
+</svg>
