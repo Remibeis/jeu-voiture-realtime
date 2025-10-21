@@ -9,15 +9,22 @@ const io = socketIo(server);
 app.use(express.static('public'));
 
 io.on('connection', (socket) => {
-  console.log('Un utilisateur est connecté');
+  console.log('Un pilote est connecté ✈️');
 
+  // Handle plane movement
   socket.on('control', (data) => {
     socket.broadcast.emit('update', data);
-    console.log(`Mouvement reçu: ${data.action} - ${data.direction || ''}`);
+    console.log(`Mouvement avion: ${data.action} - ${data.direction || ''}`);
+  });
+
+  // Handle shooting
+  socket.on('player-shoot', () => {
+    socket.broadcast.emit('shoot-projectile');
+    console.log('Tir de projectile déclenché 💥');
   });
 
   socket.on('disconnect', () => {
-    console.log('Un utilisateur s\'est déconnecté');
+    console.log('Un pilote s\'est déconnecté');
   });
 });
 
