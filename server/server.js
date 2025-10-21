@@ -22,8 +22,8 @@ io.on('connection', (socket) => {
 });
 
 const PORT = 3000;
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Serveur en écoute sur http://localhost:${PORT}`);
   console.log('Pour la démo, ouvrez http://localhost:3000/desktop.html sur votre ordinateur');
-  console.log('Et http://<votre-ip-locale>:3000/mobile.html sur votre téléphone');
+  console.log('Et http://10.59.19.183:3000/mobile.html sur votre téléphone');
 });

@@ -21,20 +21,64 @@
         <button id="accelerate">Accélérer</button>
     </div>
 
+    <div id="status" style="position: fixed; top: 10px; left: 10px; color: #fff; font-size: 14px;">Connexion...</div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        const socket = io();
+        const statusDiv = document.getElementById('status');
+        
+        // Add connection timeout
+        const socket = io({
+            timeout: 5000,
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 5
+        });
 
         const leftBtn = document.getElementById('left');
         const rightBtn = document.getElementById('right');
         const accelerateBtn = document.getElementById('accelerate');
 
+        // Connection status feedback
+        socket.on('connect', () => {
+            statusDiv.textContent = 'Connecté ✓';
+            statusDiv.style.color = '#0f0';
+            console.log('Connected to server');
+        });
+
+        socket.on('disconnect', () => {
+            statusDiv.textContent = 'Déconnecté ✗';
+            statusDiv.style.color = '#f00';
+            console.log('Disconnected from server');
+        });
+
+        socket.on('connect_error', (error) => {
+            statusDiv.textContent = 'Erreur de connexion ✗';
+            statusDiv.style.color = '#f00';
+            console.error('Connection error:', error);
+        });
+
         function sendControl(action, direction = '') {
-            socket.emit('control', { action, direction });
+            if (socket.connected) {
+                socket.emit('control', { action, direction });
+                console.log(`Sent: ${action} ${direction}`);
+            } else {
+                console.warn('Not connected - cannot send control');
+            }
         }
+
         leftBtn.addEventListener('pointerdown', () => sendControl('move', 'left'));
         rightBtn.addEventListener('pointerdown', () => sendControl('move', 'right'));
         accelerateBtn.addEventListener('pointerdown', () => sendControl('accelerate'));
+
+        // Prevent buttons from being stuck on mobile
+        ['pointerup', 'pointercancel', 'touchend'].forEach(event => {
+            [leftBtn, rightBtn, accelerateBtn].forEach(btn => {
+                btn.addEventListener(event, () => {
+                    // Optional: send stop signal when button is released
+                });
+            });
+        });
     </script>
 </body>
 </html>
