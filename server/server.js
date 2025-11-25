@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
+const os = require('os');
 
 const app = express();
 const server = http.createServer(app);
@@ -8,10 +9,11 @@ const io = socketIo(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"]
-  }
+  },
+  transports: ['websocket', 'polling']
 });
 
-// Add CORS headers for mobile browsers
+// Middleware CORS
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -19,9 +21,10 @@ app.use((req, res, next) => {
   next();
 });
 
+// Fichiers statiques (public doit contenir desktop.html & mobile.html)
 app.use(express.static('public'));
 
-// Simple test endpoint for mobile debugging
+// Route de test
 app.get('/test', (req, res) => {
   const clientIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.socket.remoteAddress;
   res.json({
@@ -32,16 +35,15 @@ app.get('/test', (req, res) => {
   });
 });
 
+// WebSocket / Socket.IO
 io.on('connection', (socket) => {
   console.log('Un pilote est connecté ✈️');
 
-  // Handle plane movement
   socket.on('control', (data) => {
     socket.broadcast.emit('update', data);
     console.log(`Mouvement avion: ${data.action} - ${data.direction || ''}`);
   });
 
-  // Handle shooting
   socket.on('player-shoot', () => {
     socket.broadcast.emit('shoot-projectile');
     console.log('Tir de projectile déclenché 💥');
@@ -53,31 +55,27 @@ io.on('connection', (socket) => {
 });
 
 const PORT = 3000;
+
+// 🔍 Fonction pour récupérer l'IP locale (Wi-Fi / Ethernet)
+function getLocalIp() {
+  const nets = os.networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === 'IPv4' && !net.internal) {
+        return net.address; // ex: 10.59.18.129
+      }
+    }
+  }
+  return 'localhost';
+}
+
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Serveur en écoute sur TOUTES les interfaces:`);
-  console.log(`   💻 Local: http://localhost:${PORT}/desktop.html`);
-  console.log(`   📱 Mobile: http://10.59.19.183:${PORT}/mobile.html`);
-  console.log(`   🌐 Réseau: http://0.0.0.0:${PORT}`);
-  
-  // Test server accessibility
-  const testUrls = [
-    `http://localhost:${PORT}/mobile.html`,
-    `http://10.59.19.183:${PORT}/mobile.html`
-  ];
-  
-  console.log('\n🔍 Test de connectivité:');
-  testUrls.forEach(url => {
-    const http = require('http');
-    const urlObj = new URL(url);
-    const req = http.get({
-      hostname: urlObj.hostname,
-      port: urlObj.port,
-      path: urlObj.pathname,
-      timeout: 2000
-    }, (res) => {
-      console.log(`   ✅ ${url} - Status: ${res.statusCode}`);
-    }).on('error', (err) => {
-      console.log(`   ❌ ${url} - Error: ${err.message}`);
-    });
-  });
+  const localIp = getLocalIp();
+
+  console.log(`🚀 Serveur en écoute sur port ${PORT}`);
+  console.log(`   💻 PC:       http://localhost:${PORT}/desktop.html`);
+  console.log(`   📱 Téléphone: http://${localIp}:${PORT}/mobile.html`);
 });
+
+
+
