@@ -3,233 +3,296 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jeu Avion 2D - Desktop</title>
-    <style>
-        body {
-            margin: 0;
-            background: linear-gradient(180deg, #87CEEB 0%, #98FB98 100%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-            font-family: Arial, sans-serif;
-        }
-        #sky {
-            position: relative;
-            width: 600px;
-            height: 100vh;
-            background: linear-gradient(180deg, #1e3c72 0%, #2a5298 50%, #87CEEB 100%);
-            border: 3px solid #333;
-            overflow: hidden;
-        }
-        #plane {
-            position: absolute;
-            width: 60px;
-            height: 40px;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            transition: left 0.1s linear;
-            z-index: 10;
-        }
-        #plane img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-        .projectile {
-            position: absolute;
-            width: 4px;
-            height: 20px;
-            background-color: #ffff00;
-            border-radius: 50%;
-            animation: shoot 2s linear forwards;
-            z-index: 5;
-        }
-        @keyframes shoot {
-            from { bottom: 140px; }
-            to { bottom: 100vh; opacity: 0; }
-        }
-        @keyframes flicker {
-            0% { opacity: 1; transform: scaleX(1); }
-            100% { opacity: 0.7; transform: scaleX(1.2); }
-        }
-        .cloud {
-            position: absolute;
-            background: rgba(255,255,255,0.8);
-            border-radius: 50px;
-            animation: float 15s linear infinite;
-        }
-        .cloud1 { width: 80px; height: 40px; top: 20%; left: -100px; }
-        .cloud2 { width: 100px; height: 50px; top: 40%; left: -120px; animation-delay: -5s; }
-        .cloud3 { width: 60px; height: 30px; top: 60%; left: -80px; animation-delay: -10s; }
-
-        @keyframes float {
-            from { left: -120px; }
-            to { left: 100vw; }
-        }
-
-        #score {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: white;
-            font-size: 18px;
-            z-index: 15;
-        }
-        #controls-info {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            color: white;
-            font-size: 14px;
-            z-index: 15;
-        }
-    </style>
+    <title>Jeu Avion Espace - Desktop</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-    <div id="sky">
-        <div id="plane">
-            <img src="fighter-jet.svg" alt="Fighter Jet" />
+<body class="desktop-page">
+    <div id="space-road">
+        <div id="lane"></div>
+
+        <!-- HUD -->
+        <div id="hud">
+            <div id="score">Distance : 0 m | Vitesse : 0.0</div>
+            <div id="hud-line">
+                Obstacles détruits : <span id="obstacle-count">0</span>
+            </div>
         </div>
-        <div class="cloud cloud1"></div>
-        <div class="cloud cloud2"></div>
-        <div class="cloud cloud3"></div>
-        <div id="score">Score: 0</div>
-        <div id="controls-info">
-            📱 Utilisez votre téléphone pour contrôler l'avion<br>
-            ← → Tourner | ✈️ Accélérer | 💥 Tirer
+
+        <!-- Game over -->
+        <div id="game-over">💥 Crash ! Cliquez pour recommencer</div>
+
+        <!-- Avion -->
+        <div id="ship">
+            <img src="fighter-jet.svg" alt="Avion de chasse" />
+            <div id="ship-thrust"></div>
         </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        const plane = document.getElementById('plane');
-        const sky = document.getElementById('sky');
+
+        const spaceRoad = document.getElementById('space-road');
+        const lane = document.getElementById('lane');
+        const ship = document.getElementById('ship');
         const scoreElement = document.getElementById('score');
-        
-        let planePosition = sky.offsetWidth / 2;
-        let score = 0;
-        let projectileCount = 0;
-        let currentRotation = 0;
-        let isAccelerating = false;
+        const obstacleCountElement = document.getElementById('obstacle-count');
+        const gameOverElement = document.getElementById('game-over');
 
-        plane.style.left = `${planePosition}px`;
+        const SHIP_WIDTH = 70;
+        let shipX = (spaceRoad.clientWidth - SHIP_WIDTH) / 2;
+        const SHIP_BASE_BOTTOM = 80;
 
+        // Vitesse de base + boost (plus lent)
+        const BASE_SPEED = 1.8;     // avance tout seul mais tranquille
+        let boost = 0;              // boost additionnel
+        const MAX_BOOST = 5;
+        const ACCEL_STEP = 0.6;
+        const FRICTION = 0.25;
+
+        // score
+        let distance = 0;
+        let destroyed = 0;
+        let displaySpeed = BASE_SPEED;
+
+        // scroll
+        let backgroundOffset = 0;
+        let lastFrameTime = performance.now();
+
+        // obstacles / tirs
+        const obstacles = [];
+        const projectiles = [];
+        let spawnTimer = 0;
+        const SPAWN_INTERVAL = 20;
+
+        let isGameOver = false;
+
+        function updateShipPosition() {
+            ship.style.left = shipX + 'px';
+            ship.style.bottom = SHIP_BASE_BOTTOM + 'px';
+        }
+
+        updateShipPosition();
+
+        function getLaneBounds() {
+            const laneRect = lane.getBoundingClientRect();
+            const roadRect = spaceRoad.getBoundingClientRect();
+
+            const minX = laneRect.left - roadRect.left;
+            const maxX = laneRect.right - roadRect.left - SHIP_WIDTH;
+            return { minX, maxX };
+        }
+
+        // --------- commandes depuis mobile ---------
         socket.on('update', (data) => {
-            console.log('🎮 Control reçu:', data);
-            
+            if (isGameOver) return;
+            if (!data || typeof data.action !== 'string') return;
+
+            if (data.action === 'accelerate') {
+                boost = Math.min(MAX_BOOST, boost + ACCEL_STEP);
+                ship.classList.add('accelerating');
+            }
+
+            // on peut toujours tourner, même sans accélération
             if (data.action === 'move') {
+                const step = 16; // un peu moins violent aussi
                 if (data.direction === 'left') {
-                    planePosition -= 12;
-                    currentRotation = -15;
+                    shipX -= step;
                 } else if (data.direction === 'right') {
-                    planePosition += 12;
-                    currentRotation = 15;
+                    shipX += step;
                 }
 
-                const planeWidth = plane.offsetWidth;
-                const buffer = planeWidth / 2 + 10;
-                planePosition = Math.max(buffer, Math.min(sky.offsetWidth - buffer, planePosition));
-                plane.style.left = `${planePosition}px`;
-
-                plane.style.transform =
-                    `translateX(-50%) rotate(${currentRotation}deg) ${isAccelerating ? 'scale(1.1)' : ''}`;
-
-                setTimeout(() => {
-                    currentRotation *= 0.8;
-                    if (Math.abs(currentRotation) < 1) currentRotation = 0;
-                    plane.style.transform =
-                        `translateX(-50%) rotate(${currentRotation}deg) ${isAccelerating ? 'scale(1.1)' : ''}`;
-                }, 100);
-
-            } else if (data.action === 'accelerate') {
-                isAccelerating = true;
-                plane.style.transform = `translateX(-50%) rotate(${currentRotation}deg) scale(1.2)`;
-                
-                const afterburner = document.createElement('div');
-                afterburner.style.cssText = `
-                    position: absolute;
-                    width: 20px; height: 8px;
-                    background: linear-gradient(90deg, #ff4400, #ffaa00, transparent);
-                    left: ${planePosition + 30}px;
-                    bottom: 115px;
-                    border-radius: 50%;
-                    animation: flicker 0.1s infinite alternate;
-                    z-index: 8;
-                `;
-                sky.appendChild(afterburner);
-                
-                setTimeout(() => {
-                    isAccelerating = false;
-                    plane.style.transform = `translateX(-50%) rotate(${currentRotation}deg) scale(1)`;
-                    if (afterburner.parentNode) {
-                        afterburner.parentNode.removeChild(afterburner);
-                    }
-                }, 300);
+                const { minX, maxX } = getLaneBounds();
+                shipX = Math.max(minX, Math.min(maxX, shipX));
+                updateShipPosition();
             }
         });
 
         socket.on('shoot-projectile', () => {
+            if (isGameOver) return;
             createProjectile();
         });
 
+        // --------- tirs ---------
         function createProjectile() {
-            const projectilePositions = [
-                { x: planePosition - 15 },
-                { x: planePosition + 15 }
-            ];
-            
-            projectilePositions.forEach(pos => {
-                const projectile = document.createElement('div');
-                projectile.className = 'projectile';
-                projectile.style.left = `${pos.x}px`;
-                projectile.style.bottom = '140px';
-                projectile.style.background = 'linear-gradient(0deg, #ffff00, #ff8800)';
-                projectile.style.boxShadow = '0 0 8px #ffff00';
-                
-                sky.appendChild(projectile);
-                
-                setTimeout(() => {
-                    if (projectile.parentNode) {
-                        projectile.parentNode.removeChild(projectile);
-                    }
-                }, 2000);
-            });
-            
-            projectileCount++;
-            score += 15;
-            scoreElement.textContent = `Score: ${score} | Missiles: ${projectileCount}`;
+            const proj = document.createElement('div');
+            proj.className = 'projectile';
 
-            const muzzleFlash = document.createElement('div');
-            muzzleFlash.style.cssText = `
-                position: absolute;
-                left: ${planePosition - 10}px;
-                bottom: 125px;
-                width: 20px; height: 20px;
-                background: radial-gradient(circle, #ffffff, #ffff00, transparent);
-                border-radius: 50%;
-                z-index: 15;
-                animation: flicker 0.1s 3 alternate;
-            `;
-            
-            sky.appendChild(muzzleFlash);
-            setTimeout(() => {
-                if (muzzleFlash.parentNode) {
-                    muzzleFlash.parentNode.removeChild(muzzleFlash);
-                }
-            }, 300);
+            const shipRect = ship.getBoundingClientRect();
+            const roadRect = spaceRoad.getBoundingClientRect();
+
+            const x = shipRect.left - roadRect.left + shipRect.width - 10;
+            const y = shipRect.top - roadRect.top + shipRect.height / 2 - 9;
+
+            proj.style.left = x + 'px';
+            proj.style.top = y + 'px';
+
+            spaceRoad.appendChild(proj);
+            projectiles.push({ el: proj, x, y });
         }
 
-        socket.on('connect', () => {
-            console.log('✈️ Avion connecté au contrôle');
+        // --------- obstacles ---------
+        function spawnObstacle() {
+            const obs = document.createElement('div');
+            obs.classList.add('obstacle');
+
+            const typeRand = Math.random();
+            if (typeRand < 0.4) obs.classList.add('obstacle--asteroid');
+            else if (typeRand < 0.8) obs.classList.add('obstacle--cloud');
+            else obs.classList.add('obstacle--sun');
+
+            const laneRect = lane.getBoundingClientRect();
+            const roadRect = spaceRoad.getBoundingClientRect();
+            const margin = 25;
+
+            const minX = laneRect.left - roadRect.left + margin;
+            const maxX = laneRect.right - roadRect.left - margin - 38;
+
+            const x = minX + Math.random() * (maxX - minX);
+            const y = -50;
+
+            obs.style.left = x + 'px';
+            obs.style.top = y + 'px';
+
+            spaceRoad.appendChild(obs);
+            obstacles.push({ el: obs, x, y });
+        }
+
+        function resetGame() {
+            isGameOver = false;
+            gameOverElement.style.display = 'none';
+
+            boost = 0;
+            distance = 0;
+            destroyed = 0;
+            backgroundOffset = 0;
+            spawnTimer = 0;
+
+            obstacles.forEach(o => o.el.remove());
+            projectiles.forEach(p => p.el.remove());
+            obstacles.length = 0;
+            projectiles.length = 0;
+
+            shipX = (spaceRoad.clientWidth - SHIP_WIDTH) / 2;
+            updateShipPosition();
+            ship.classList.remove('accelerating');
+            updateHUD();
+        }
+
+        gameOverElement.addEventListener('click', resetGame);
+        spaceRoad.addEventListener('click', () => {
+            if (isGameOver) resetGame();
         });
 
-        socket.on('disconnect', () => {
-            console.log('🚫 Avion déconnecté du contrôle');
-        });
+        function updateHUD() {
+            scoreElement.textContent =
+                `Distance : ${Math.floor(distance)} m | Vitesse : ${displaySpeed.toFixed(1)}`;
+            obstacleCountElement.textContent = destroyed;
+        }
+
+        function rectsOverlap(r1, r2) {
+            return !(
+                r1.right < r2.left ||
+                r1.left > r2.right ||
+                r1.bottom < r2.top ||
+                r1.top > r2.bottom
+            );
+        }
+
+        // --------- boucle de jeu ---------
+        function gameLoop(timestamp) {
+            const dt = (timestamp - lastFrameTime) / 16.67;
+            lastFrameTime = timestamp;
+
+            if (!isGameOver) {
+                // friction sur le boost (la vitesse de base reste)
+                if (boost > 0) {
+                    boost = Math.max(0, boost - FRICTION * dt);
+                } else {
+                    ship.classList.remove('accelerating');
+                }
+
+                const currentSpeed = BASE_SPEED + boost;
+                displaySpeed = currentSpeed;
+
+                // scroll espace plus lent
+                backgroundOffset += currentSpeed * dt * 2.0;
+                spaceRoad.style.backgroundPositionY = `${backgroundOffset}px`;
+
+                // distance
+                distance += currentSpeed * dt * 0.8;
+
+                // spawn obstacles : rythme dépend de la vitesse
+                spawnTimer += dt * (currentSpeed / BASE_SPEED);
+                if (spawnTimer >= SPAWN_INTERVAL) {
+                    spawnTimer = 0;
+                    spawnObstacle();
+                }
+
+                const roadRect = spaceRoad.getBoundingClientRect();
+                const shipRect = ship.getBoundingClientRect();
+
+                // update obstacles (descente plus douce)
+                for (let i = obstacles.length - 1; i >= 0; i--) {
+                    const o = obstacles[i];
+                    o.y += currentSpeed * dt * 2.3;
+                    o.el.style.top = o.y + 'px';
+
+                    const obsRect = o.el.getBoundingClientRect();
+
+                    // collision avion / obstacle
+                    if (rectsOverlap(shipRect, obsRect)) {
+                        isGameOver = true;
+                        gameOverElement.style.display = 'block';
+                    }
+
+                    // sorti de l'écran
+                    if (obsRect.top > roadRect.bottom) {
+                        o.el.remove();
+                        obstacles.splice(i, 1);
+                    }
+                }
+
+                // projectiles un peu plus lents
+                for (let pIndex = projectiles.length - 1; pIndex >= 0; pIndex--) {
+                    const p = projectiles[pIndex];
+                    p.y -= 22 * dt * 2.5;
+                    p.el.style.top = p.y + 'px';
+
+                    const projRect = p.el.getBoundingClientRect();
+
+                    if (projRect.bottom < roadRect.top) {
+                        p.el.remove();
+                        projectiles.splice(pIndex, 1);
+                        continue;
+                    }
+
+                    // collision projectile / obstacle
+                    for (let oIndex = obstacles.length - 1; oIndex >= 0; oIndex--) {
+                        const o = obstacles[oIndex];
+                        const obsRect = o.el.getBoundingClientRect();
+
+                        if (rectsOverlap(projRect, obsRect)) {
+                            o.el.classList.add('exploding');
+                            setTimeout(() => o.el.remove(), 180);
+
+                            obstacles.splice(oIndex, 1);
+                            p.el.remove();
+                            projectiles.splice(pIndex, 1);
+
+                            destroyed++;
+                            break;
+                        }
+                    }
+                }
+
+                updateHUD();
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        requestAnimationFrame(gameLoop);
     </script>
 </body>
 </html>

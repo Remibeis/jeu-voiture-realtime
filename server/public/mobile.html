@@ -5,90 +5,25 @@
     <meta name="viewport"
           content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Contrôle Avion</title>
-    <style>
-        body {
-            touch-action: manipulation;
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            height: 100vh;
-            margin: 0;
-            background: linear-gradient(180deg, #1e3c72 0%, #2a5298 100%);
-        }
-        .controls {
-            display: flex;
-            justify-content: space-around;
-            padding: 20px;
-        }
-        .actions {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            padding: 20px;
-        }
-        button {
-            width: 100px;
-            height: 100px;
-            font-size: 20px;
-            border-radius: 50%;
-            border: 2px solid #fff;
-            background-color: #444;
-            color: #fff;
-            user-select: none;
-            transition: background-color 0.2s, transform 0.1s;
-        }
-        button:active {
-            background-color: #666;
-            transform: scale(0.95);
-        }
-        #accelerate {
-            width: 100%;
-            height: 80px;
-            font-size: 24px;
-            border-radius: 20px;
-            background-color: #0066cc;
-        }
-        #shoot-button {
-            background-color: #cc3300;
-            width: 100%;
-            height: 80px;
-            font-size: 24px;
-            border-radius: 20px;
-        }
-        #shoot-button:active {
-            background-color: #ff4400;
-        }
-        .plane-icon {
-            font-size: 30px;
-        }
-        #status {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            color: #fff;
-            font-size: 14px;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="mobile-page">
     <div id="status">Chargement Socket.IO...</div>
 
-    <div class="controls">
-        <button id="left">
-            <span class="plane-icon">↺</span><br>Gauche
-        </button>
-        <button id="right">
-            <span class="plane-icon">↻</span><br>Droite
-        </button>
+    <!-- JOYSTICK BAS GAUCHE -->
+    <div class="joystick-wrapper">
+        <div id="joystick-base">
+            <div id="joystick-knob"></div>
+        </div>
     </div>
 
-    <div class="actions">
+    <!-- BOUTONS ACTIONS BAS DROITE -->
+    <div class="actions-right">
         <button id="accelerate">
-            <span class="plane-icon">✈️</span><br>Accélérer
+            <span class="plane-icon">✈️</span> Accélérer
         </button>
         <button id="shoot-button">
-            <span class="plane-icon">💥</span><br>Tirer
+            <span class="plane-icon">💥</span> Tirer
         </button>
     </div>
 
@@ -99,28 +34,25 @@
         let socket;
         try {
             statusDiv.textContent = 'Connexion Socket.IO...';
-            // IMPORTANT : aucune IP en dur, on se connecte au même host que la page
-            socket = io();
+            socket = io(); // même host que la page
         } catch (error) {
             statusDiv.textContent = 'Erreur Socket.IO: ' + error.message;
             console.error('Socket.IO Error:', error);
         }
 
-        const leftBtn = document.getElementById('left');
-        const rightBtn = document.getElementById('right');
         const accelerateBtn = document.getElementById('accelerate');
         const shootButton = document.getElementById('shoot-button');
+        const joystickBase = document.getElementById('joystick-base');
+        const joystickKnob = document.getElementById('joystick-knob');
 
         socket.on('connect', () => {
             statusDiv.textContent = 'Avion Connecté ✈️';
             statusDiv.style.color = '#0f0';
-            console.log('Connected to server');
         });
 
         socket.on('disconnect', () => {
             statusDiv.textContent = 'Avion Déconnecté ✗';
             statusDiv.style.color = '#f00';
-            console.log('Disconnected from server');
         });
 
         socket.on('connect_error', (error) => {
@@ -132,80 +64,158 @@
         function sendControl(action, direction = '') {
             if (socket && socket.connected) {
                 socket.emit('control', { action, direction });
-                console.log(`Sent: ${action} ${direction}`);
-            } else {
-                console.warn('Not connected - cannot send control');
             }
         }
 
-        function addButtonFeedback(button, action) {
-            let isPressed = false;
-            let pressInterval = null;
-            
-            const startAction = () => {
-                if (!isPressed) {
-                    isPressed = true;
-                    button.style.transform = 'scale(0.9)';
-                    button.style.backgroundColor = '#666';
+        /* --------- BOUTON ACCÉLÉRER (maintien = boost continu) --------- */
 
-                    if (action) action();
+        function makeHoldButton(button, onTick) {
+            let intervalId = null;
 
-                    if (button === leftBtn || button === rightBtn) {
-                        pressInterval = setInterval(() => {
-                            if (isPressed && action) action();
-                        }, 50);
-                    }
-                }
+            const start = (e) => {
+                e.preventDefault();
+                if (intervalId !== null) return;
+
+                button.style.transform = 'scale(0.95)';
+                button.style.boxShadow = '0 0 8px rgba(255,255,255,0.4)';
+
+                onTick();
+                intervalId = setInterval(onTick, 60);
             };
 
-            const endAction = () => {
-                if (isPressed) {
-                    isPressed = false;
-                    button.style.transform = 'scale(1)';
-                    button.style.backgroundColor = '#444';
-
-                    if (pressInterval) {
-                        clearInterval(pressInterval);
-                        pressInterval = null;
-                    }
+            const stop = (e) => {
+                if (e) e.preventDefault();
+                if (intervalId !== null) {
+                    clearInterval(intervalId);
+                    intervalId = null;
                 }
+                button.style.transform = 'scale(1)';
+                button.style.boxShadow = 'none';
             };
 
-            ['touchstart', 'mousedown', 'pointerdown'].forEach(event => {
-                button.addEventListener(event, (e) => {
-                    e.preventDefault();
-                    startAction();
-                });
-            });
+            ['pointerdown'].forEach(ev =>
+                button.addEventListener(ev, start)
+            );
+            ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev =>
+                button.addEventListener(ev, stop)
+            );
 
-            ['touchend', 'mouseup', 'pointerup', 'touchcancel', 'pointercancel'].forEach(event => {
-                button.addEventListener(event, (e) => {
-                    e.preventDefault();
-                    endAction();
-                });
-            });
-
-            button.addEventListener('contextmenu', (e) => e.preventDefault());
+            button.addEventListener('contextmenu', e => e.preventDefault());
         }
 
-        addButtonFeedback(leftBtn, () => sendControl('move', 'left'));
-        addButtonFeedback(rightBtn, () => sendControl('move', 'right'));
-        addButtonFeedback(accelerateBtn, () => sendControl('accelerate'));
+        makeHoldButton(accelerateBtn, () => sendControl('accelerate'));
+
+        /* --------- BOUTON TIR (pointerdown pour autoriser multitouch) --------- */
 
         let shootCooldown = false;
-        addButtonFeedback(shootButton, () => {
-            if (!shootCooldown && socket && socket.connected) {
-                shootCooldown = true;
-                socket.emit('player-shoot');
-                console.log('🚀 Shot fired!');
+        shootButton.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            if (!socket || !socket.connected) return;
+            if (shootCooldown) return;
 
-                shootButton.innerHTML = '<span class="plane-icon">🔥</span><br>FIRE!';
-                setTimeout(() => {
-                    shootButton.innerHTML = '<span class="plane-icon">💥</span><br>Tirer';
-                    shootCooldown = false;
-                }, 200);
-            }
+            shootCooldown = true;
+            socket.emit('player-shoot');
+
+            shootButton.innerHTML = '<span class="plane-icon">🔥</span> FIRE!';
+            setTimeout(() => {
+                shootButton.innerHTML = '<span class="plane-icon">💥</span> Tirer';
+                shootCooldown = false;
+            }, 200);
         });
+
+        /* --------- JOYSTICK (gauche/droite continu) --------- */
+
+        let joystickActive = false;
+        let joystickDirection = null; // 'left' / 'right' / null
+        let joystickInterval = null;
+
+        function setJoystickDirectionFromDelta(dx) {
+            const deadZone = 10;
+            if (dx > deadZone) {
+                joystickDirection = 'right';
+            } else if (dx < -deadZone) {
+                joystickDirection = 'left';
+            } else {
+                joystickDirection = null;
+            }
+        }
+
+        function updateJoystickKnob(clientX, clientY) {
+            const baseRect = joystickBase.getBoundingClientRect();
+            const knobRect = joystickKnob.getBoundingClientRect();
+
+            const centerX = baseRect.width / 2;
+            const centerY = baseRect.height / 2;
+
+            // position relative dans la base
+            const localX = clientX - baseRect.left;
+            const localY = clientY - baseRect.top;
+
+            let dx = localX - centerX;
+            let dy = localY - centerY;
+
+            const maxDist = baseRect.width / 2 - knobRect.width / 2;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > maxDist) {
+                const ratio = maxDist / dist;
+                dx *= ratio;
+                dy *= ratio;
+            }
+
+            joystickKnob.style.left = (centerX + dx - knobRect.width / 2) + 'px';
+            joystickKnob.style.top  = (centerY + dy - knobRect.height / 2) + 'px';
+
+            setJoystickDirectionFromDelta(dx);
+        }
+
+        function resetJoystick() {
+            const baseRect = joystickBase.getBoundingClientRect();
+            const knobRect = joystickKnob.getBoundingClientRect();
+            joystickKnob.style.left = (baseRect.width / 2 - knobRect.width / 2) + 'px';
+            joystickKnob.style.top  = (baseRect.height / 2 - knobRect.height / 2) + 'px';
+            joystickDirection = null;
+        }
+
+        function startJoystickInterval() {
+            if (joystickInterval !== null) return;
+            joystickInterval = setInterval(() => {
+                if (!joystickDirection) return;
+                sendControl('move', joystickDirection);
+            }, 60);
+        }
+
+        function stopJoystickInterval() {
+            if (joystickInterval !== null) {
+                clearInterval(joystickInterval);
+                joystickInterval = null;
+            }
+        }
+
+        joystickBase.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            joystickActive = true;
+            joystickBase.setPointerCapture(e.pointerId);
+            updateJoystickKnob(e.clientX, e.clientY);
+            startJoystickInterval();
+        });
+
+        joystickBase.addEventListener('pointermove', (e) => {
+            if (!joystickActive) return;
+            e.preventDefault();
+            updateJoystickKnob(e.clientX, e.clientY);
+        });
+
+        const endJoystick = (e) => {
+            if (!joystickActive) return;
+            if (e) e.preventDefault();
+            joystickActive = false;
+            resetJoystick();
+            stopJoystickInterval();
+        };
+
+        joystickBase.addEventListener('pointerup', endJoystick);
+        joystickBase.addEventListener('pointercancel', endJoystick);
+        joystickBase.addEventListener('pointerleave', endJoystick);
     </script>
 </body>
 </html>
