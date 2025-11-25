@@ -21,12 +21,15 @@ app.use((req, res, next) => {
   next();
 });
 
-// Fichiers statiques (public doit contenir desktop.html & mobile.html)
+// Fichiers statiques : desktop.html, mobile.html, fighter-jet.svg...
 app.use(express.static('public'));
 
-// Route de test
+// Route de test (optionnel)
 app.get('/test', (req, res) => {
-  const clientIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.socket.remoteAddress;
+  const clientIP =
+    req.headers['x-forwarded-for'] ||
+    req.connection.remoteAddress ||
+    req.socket.remoteAddress;
   res.json({
     message: 'Mobile connection test successful! 📱✅',
     timestamp: new Date().toISOString(),
@@ -35,11 +38,12 @@ app.get('/test', (req, res) => {
   });
 });
 
-// WebSocket / Socket.IO
+// Gestion Socket.IO
 io.on('connection', (socket) => {
   console.log('Un pilote est connecté ✈️');
 
   socket.on('control', (data) => {
+    // data = { action: 'move' | 'accelerate', direction?: 'left' | 'right' }
     socket.broadcast.emit('update', data);
     console.log(`Mouvement avion: ${data.action} - ${data.direction || ''}`);
   });
@@ -50,19 +54,19 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log('Un pilote s\'est déconnecté');
+    console.log("Un pilote s'est déconnecté");
   });
 });
 
 const PORT = 3000;
 
-// 🔍 Fonction pour récupérer l'IP locale (Wi-Fi / Ethernet)
+// Récupère l'IP locale (Wi-Fi / Ethernet)
 function getLocalIp() {
   const nets = os.networkInterfaces();
   for (const name of Object.keys(nets)) {
     for (const net of nets[name]) {
       if (net.family === 'IPv4' && !net.internal) {
-        return net.address; // ex: 10.59.18.129
+        return net.address; // ex : 10.59.18.129
       }
     }
   }
@@ -73,9 +77,10 @@ server.listen(PORT, '0.0.0.0', () => {
   const localIp = getLocalIp();
 
   console.log(`🚀 Serveur en écoute sur port ${PORT}`);
-  console.log(`   💻 PC:       http://localhost:${PORT}/desktop.html`);
+  console.log(`   💻 PC:        http://localhost:${PORT}/desktop.html`);
   console.log(`   📱 Téléphone: http://${localIp}:${PORT}/mobile.html`);
 });
+
 
 
 
