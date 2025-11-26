@@ -10,7 +10,7 @@
     <div id="space-road">
         <div id="lane"></div>
 
-        <!-- HUD -->
+        
         <div id="hud">
             <div id="score">Distance : 0 m | Vitesse : 0.0</div>
             <div id="hud-line">
@@ -18,10 +18,10 @@
             </div>
         </div>
 
-        <!-- Game over -->
+        
         <div id="game-over">💥 Crash ! Cliquez pour recommencer</div>
 
-        <!-- Avion -->
+        
         <div id="ship">
             <img src="fighter-jet.svg" alt="Avion de chasse" />
             <div id="ship-thrust"></div>
@@ -43,23 +43,23 @@
         let shipX = (spaceRoad.clientWidth - SHIP_WIDTH) / 2;
         const SHIP_BASE_BOTTOM = 80;
 
-        // Vitesse de base + boost (plus lent)
-        const BASE_SPEED = 1.8;     // avance tout seul mais tranquille
-        let boost = 0;              // boost additionnel
+        
+        const BASE_SPEED = 1.8;     
+        let boost = 0;              
         const MAX_BOOST = 5;
         const ACCEL_STEP = 0.6;
         const FRICTION = 0.25;
 
-        // score
+        
         let distance = 0;
         let destroyed = 0;
         let displaySpeed = BASE_SPEED;
 
-        // scroll
+        
         let backgroundOffset = 0;
         let lastFrameTime = performance.now();
 
-        // obstacles / tirs
+        
         const obstacles = [];
         const projectiles = [];
         let spawnTimer = 0;
@@ -83,7 +83,7 @@
             return { minX, maxX };
         }
 
-        // --------- commandes depuis mobile ---------
+        
         socket.on('update', (data) => {
             if (isGameOver) return;
             if (!data || typeof data.action !== 'string') return;
@@ -93,9 +93,9 @@
                 ship.classList.add('accelerating');
             }
 
-            // on peut toujours tourner, même sans accélération
+            
             if (data.action === 'move') {
-                const step = 16; // un peu moins violent aussi
+                const step = 16; 
                 if (data.direction === 'left') {
                     shipX -= step;
                 } else if (data.direction === 'right') {
@@ -113,7 +113,7 @@
             createProjectile();
         });
 
-        // --------- tirs ---------
+        
         function createProjectile() {
             const proj = document.createElement('div');
             proj.className = 'projectile';
@@ -131,7 +131,7 @@
             projectiles.push({ el: proj, x, y });
         }
 
-        // --------- obstacles ---------
+        
         function spawnObstacle() {
             const obs = document.createElement('div');
             obs.classList.add('obstacle');
@@ -199,13 +199,13 @@
             );
         }
 
-        // --------- boucle de jeu ---------
+        
         function gameLoop(timestamp) {
             const dt = (timestamp - lastFrameTime) / 16.67;
             lastFrameTime = timestamp;
 
             if (!isGameOver) {
-                // friction sur le boost (la vitesse de base reste)
+                
                 if (boost > 0) {
                     boost = Math.max(0, boost - FRICTION * dt);
                 } else {
@@ -215,14 +215,14 @@
                 const currentSpeed = BASE_SPEED + boost;
                 displaySpeed = currentSpeed;
 
-                // scroll espace plus lent
+                
                 backgroundOffset += currentSpeed * dt * 2.0;
                 spaceRoad.style.backgroundPositionY = `${backgroundOffset}px`;
 
-                // distance
+                
                 distance += currentSpeed * dt * 0.8;
 
-                // spawn obstacles : rythme dépend de la vitesse
+                
                 spawnTimer += dt * (currentSpeed / BASE_SPEED);
                 if (spawnTimer >= SPAWN_INTERVAL) {
                     spawnTimer = 0;
@@ -232,7 +232,7 @@
                 const roadRect = spaceRoad.getBoundingClientRect();
                 const shipRect = ship.getBoundingClientRect();
 
-                // update obstacles (descente plus douce)
+                
                 for (let i = obstacles.length - 1; i >= 0; i--) {
                     const o = obstacles[i];
                     o.y += currentSpeed * dt * 2.3;
@@ -240,20 +240,20 @@
 
                     const obsRect = o.el.getBoundingClientRect();
 
-                    // collision avion / obstacle
+                    
                     if (rectsOverlap(shipRect, obsRect)) {
                         isGameOver = true;
                         gameOverElement.style.display = 'block';
                     }
 
-                    // sorti de l'écran
+                    
                     if (obsRect.top > roadRect.bottom) {
                         o.el.remove();
                         obstacles.splice(i, 1);
                     }
                 }
 
-                // projectiles un peu plus lents
+                
                 for (let pIndex = projectiles.length - 1; pIndex >= 0; pIndex--) {
                     const p = projectiles[pIndex];
                     p.y -= 22 * dt * 2.5;
@@ -267,7 +267,7 @@
                         continue;
                     }
 
-                    // collision projectile / obstacle
+                    
                     for (let oIndex = obstacles.length - 1; oIndex >= 0; oIndex--) {
                         const o = obstacles[oIndex];
                         const obsRect = o.el.getBoundingClientRect();
@@ -296,3 +296,4 @@
     </script>
 </body>
 </html>
+s

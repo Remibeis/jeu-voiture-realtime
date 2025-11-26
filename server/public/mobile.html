@@ -10,14 +10,14 @@
 <body class="mobile-page">
     <div id="status">Chargement Socket.IO...</div>
 
-    <!-- JOYSTICK BAS GAUCHE -->
+    
     <div class="joystick-wrapper">
         <div id="joystick-base">
             <div id="joystick-knob"></div>
         </div>
     </div>
 
-    <!-- BOUTONS ACTIONS BAS DROITE -->
+    
     <div class="actions-right">
         <button id="accelerate">
             <span class="plane-icon">✈️</span> Accélérer
@@ -34,7 +34,7 @@
         let socket;
         try {
             statusDiv.textContent = 'Connexion Socket.IO...';
-            socket = io(); // même host que la page
+            socket = io(); 
         } catch (error) {
             statusDiv.textContent = 'Erreur Socket.IO: ' + error.message;
             console.error('Socket.IO Error:', error);
@@ -67,7 +67,7 @@
             }
         }
 
-        /* --------- BOUTON ACCÉLÉRER (maintien = boost continu) --------- */
+        
 
         function makeHoldButton(button, onTick) {
             let intervalId = null;
@@ -105,7 +105,7 @@
 
         makeHoldButton(accelerateBtn, () => sendControl('accelerate'));
 
-        /* --------- BOUTON TIR (pointerdown pour autoriser multitouch) --------- */
+        
 
         let shootCooldown = false;
         shootButton.addEventListener('pointerdown', (e) => {
@@ -123,10 +123,10 @@
             }, 200);
         });
 
-        /* --------- JOYSTICK (gauche/droite continu) --------- */
+        
 
         let joystickActive = false;
-        let joystickDirection = null; // 'left' / 'right' / null
+        let joystickDirection = null; 
         let joystickInterval = null;
 
         function setJoystickDirectionFromDelta(dx) {
@@ -147,7 +147,7 @@
             const centerX = baseRect.width / 2;
             const centerY = baseRect.height / 2;
 
-            // position relative dans la base
+            
             const localX = clientX - baseRect.left;
             const localY = clientY - baseRect.top;
 
